@@ -14,7 +14,7 @@ export default function VoiceAssistantModule() {
   const [queries, setQueries] = useState<VoiceQuery[]>([]);
   const [showForm, setShowForm] = useState(false);
   const [query, setQuery] = useState('');
-  const [language, setLanguage] = useState('hindi');
+  const [language, setLanguage] = useState('telugu');
   const [category, setCategory] = useState('general');
 
   // Load from localStorage
@@ -31,12 +31,12 @@ export default function VoiceAssistantModule() {
   }, [queries]);
 
   const mockResponses: { [key: string]: string } = {
-    irrigation: 'आपके क्षेत्र में इस समय गेहूं को 7-10 दिन के अंतराल पर सिंचाई की आवश्यकता है। मिट्टी की नमी जांचें और तदनुसार सिंचाई करें।',
-    fertilizer: 'धान के लिए यूरिया 120 किग्रा/हेक्टेयर, फास्फोरस 60 किग्रा/हेक्टेयर, और पोटाश 40 किग्रा/हेक्टेयर की सिफारिश की जाती है।',
-    pest: 'यदि आप शूट बोरर के संकेत देख रहे हैं, तो क्विनलफॉस 1.5% का छिड़काव करें। 10 दिन के अंतराल पर 2-3 बार दोहराएं।',
-    weather: 'आने वाले 5 दिनों में बारिश की संभावना है। अपनी फसल की सुरक्षा के लिए आवश्यक उपाय करें।',
-    scheme: 'प्रधानमंत्री किसान सम्मान निधि योजना के तहत आप ₹6000 प्रति वर्ष प्राप्त कर सकते हैं। आवेदन के लिए अपने पटवारी से संपर्क करें।',
-    general: 'आपके प्रश्न के लिए धन्यवाद। कृपया अधिक विशिष्ट जानकारी प्रदान करें ताकि मैं बेहतर सहायता दे सकूं।',
+    irrigation: 'Visakhapatnam region lo rice cultivation ki liye 7-10 days gap lo irrigation necessary. Soil moisture check chesi accordingly irrigation cheyandi.',
+    fertilizer: 'Rice crop ki liye Urea 120 kg/hectare, Phosphorus 60 kg/hectare, Potash 40 kg/hectare recommend chestunnam.',
+    pest: 'Shoot borer symptoms kanipinche, Quinalphos 1.5% spray cheyandi. 10 days gap lo 2-3 times repeat cheyandi.',
+    weather: 'Next 5 days lo rain possibility undi. Mee panu protection kosam necessary measures teesukundi.',
+    scheme: 'Andhra Pradesh Rythu Bharosa scheme lo 12,500 rupees per year receive cheyandi. Local mandal office lo apply cheyandi.',
+    general: 'Mee prashna kosam dhanyavadalu. Kripaya specific information ichandi better assistance ki.',
   };
 
   const handleAddQuery = () => {
@@ -113,10 +113,10 @@ export default function VoiceAssistantModule() {
               onChange={(e) => setLanguage(e.target.value)}
               className="w-full px-4 py-2 border border-border rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-primary"
             >
+              <option value="telugu">తెలుగు (Telugu)</option>
               <option value="hindi">हिंदी (Hindi)</option>
-              <option value="punjabi">ਪੰਜਾਬੀ (Punjabi)</option>
               <option value="english">English</option>
-              <option value="haryanvi">हरियाणवी (Haryanvi)</option>
+              <option value="urdu">اردو (Urdu)</option>
             </select>
           </div>
 

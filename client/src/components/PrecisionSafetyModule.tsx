@@ -197,7 +197,7 @@ export default function PrecisionSafetyModule() {
               type="text"
               value={location}
               onChange={(e) => setLocation(e.target.value)}
-              placeholder="e.g., Near Bhiwani Market, Village Name"
+              placeholder="e.g., Near Visakhapatnam Port, Village Name"
               className="w-full px-4 py-2 border border-border rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-primary"
             />
           </div>

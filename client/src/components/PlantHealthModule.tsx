@@ -32,21 +32,21 @@ export default function PlantHealthModule() {
   }, [records]);
 
   const mockDiseases: { [key: string]: { disease: string; recommendation: string } } = {
-    wheat: {
-      disease: 'Rust (Late Blight)',
-      recommendation: 'Apply fungicide spray. Ensure proper drainage. Remove infected leaves.',
-    },
     rice: {
       disease: 'Leaf Blast',
       recommendation: 'Use resistant varieties. Apply carbendazim. Maintain proper spacing.',
     },
+    sugarcane: {
+      disease: 'Red Rot Disease',
+      recommendation: 'Remove infected plants immediately. Use certified seed. Apply fungicide treatment.',
+    },
+    groundnut: {
+      disease: 'Leaf Spot',
+      recommendation: 'Apply mancozeb spray. Ensure proper drainage. Rotate crops yearly.',
+    },
     cotton: {
       disease: 'Leaf Curl Virus',
       recommendation: 'Control whiteflies. Remove infected plants. Use neem oil spray.',
-    },
-    maize: {
-      disease: 'Corn Leaf Blight',
-      recommendation: 'Rotate crops. Apply mancozeb. Improve air circulation.',
     },
   };
 
@@ -131,10 +131,10 @@ export default function PlantHealthModule() {
               className="w-full px-4 py-2 border border-border rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-primary"
             >
               <option value="">Select crop type...</option>
-              <option value="wheat">Wheat</option>
               <option value="rice">Rice</option>
+              <option value="sugarcane">Sugarcane</option>
+              <option value="groundnut">Groundnut</option>
               <option value="cotton">Cotton</option>
-              <option value="maize">Maize</option>
             </select>
           </div>
 

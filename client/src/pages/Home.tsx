@@ -23,7 +23,7 @@ export default function Home() {
               </div>
             </div>
             <div className="text-sm text-muted-foreground">
-              Bhiwani, Haryana
+              Visakhapatnam, Andhra Pradesh
             </div>
           </div>
         </div>
