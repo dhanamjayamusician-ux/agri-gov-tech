@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react';
-import { Camera, Trash2, CheckCircle, AlertCircle, Plus } from 'lucide-react';
+import { useState, useEffect, useRef } from 'react';
+import { Camera, Trash2, CheckCircle, AlertCircle, Plus, Upload, X } from 'lucide-react';
 
 interface PlantRecord {
   id: string;
@@ -8,7 +8,9 @@ interface PlantRecord {
   severity: 'low' | 'medium' | 'high';
   date: string;
   imageUrl: string;
+  imageBase64: string;
   recommendation: string;
+  confidence: number;
 }
 
 export default function PlantHealthModule() {
@@ -17,6 +19,11 @@ export default function PlantHealthModule() {
   const [cropType, setCropType] = useState('');
   const [diseaseDetected, setDiseaseDetected] = useState('');
   const [severity, setSeverity] = useState<'low' | 'medium' | 'high'>('low');
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [imageBase64, setImageBase64] = useState<string>('');
+  const [isLoading, setIsLoading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const cameraInputRef = useRef<HTMLInputElement>(null);
 
   // Load from localStorage
   useEffect(() => {
@@ -31,31 +38,54 @@ export default function PlantHealthModule() {
     localStorage.setItem('plantHealthRecords', JSON.stringify(records));
   }, [records]);
 
-  const mockDiseases: { [key: string]: { disease: string; recommendation: string } } = {
+  const mockDiseases: { [key: string]: { disease: string; recommendation: string; confidence: number } } = {
     rice: {
       disease: 'Leaf Blast',
       recommendation: 'Use resistant varieties. Apply carbendazim. Maintain proper spacing.',
+      confidence: 0.92,
     },
     sugarcane: {
       disease: 'Red Rot Disease',
       recommendation: 'Remove infected plants immediately. Use certified seed. Apply fungicide treatment.',
+      confidence: 0.88,
     },
     groundnut: {
       disease: 'Leaf Spot',
       recommendation: 'Apply mancozeb spray. Ensure proper drainage. Rotate crops yearly.',
+      confidence: 0.85,
     },
     cotton: {
       disease: 'Leaf Curl Virus',
       recommendation: 'Control whiteflies. Remove infected plants. Use neem oil spray.',
+      confidence: 0.90,
     },
   };
 
-  const handleAddRecord = () => {
-    if (!cropType || !diseaseDetected) return;
+  const handleImageCapture = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const base64 = event.target?.result as string;
+      setImageBase64(base64);
+      setImagePreview(base64);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleAddRecord = async () => {
+    if (!cropType || !diseaseDetected || !imageBase64) return;
+
+    setIsLoading(true);
+
+    // Simulate ML model inference delay
+    await new Promise(resolve => setTimeout(resolve, 1500));
 
     const mockDisease = mockDiseases[cropType.toLowerCase()] || {
       disease: diseaseDetected,
       recommendation: 'Consult with agricultural expert for detailed guidance.',
+      confidence: 0.75,
     };
 
     const newRecord: PlantRecord = {
@@ -64,15 +94,20 @@ export default function PlantHealthModule() {
       diseaseDetected: mockDisease.disease,
       severity,
       date: new Date().toLocaleDateString('en-IN'),
-      imageUrl: `https://via.placeholder.com/300x200?text=${cropType}`,
+      imageUrl: imagePreview || '',
+      imageBase64,
       recommendation: mockDisease.recommendation,
+      confidence: mockDisease.confidence,
     };
 
     setRecords([newRecord, ...records]);
     setCropType('');
     setDiseaseDetected('');
     setSeverity('low');
+    setImagePreview(null);
+    setImageBase64('');
     setShowForm(false);
+    setIsLoading(false);
   };
 
   const handleDeleteRecord = (id: string) => {
@@ -123,6 +158,59 @@ export default function PlantHealthModule() {
         <div className="card-elevated p-6 space-y-4">
           <h3 className="text-xl font-semibold text-primary">Record New Detection</h3>
 
+          {/* Image Capture Section */}
+          <div className="space-y-3">
+            <label className="block text-sm font-medium">Capture Plant Image</label>
+            <div className="flex gap-2">
+              <button
+                onClick={() => cameraInputRef.current?.click()}
+                className="flex-1 px-4 py-3 border-2 border-dashed border-primary rounded-lg bg-blue-50 text-primary font-semibold hover:bg-blue-100 transition-colors flex items-center justify-center gap-2"
+              >
+                <Camera size={20} />
+                Take Photo
+              </button>
+              <button
+                onClick={() => fileInputRef.current?.click()}
+                className="flex-1 px-4 py-3 border-2 border-dashed border-primary rounded-lg bg-blue-50 text-primary font-semibold hover:bg-blue-100 transition-colors flex items-center justify-center gap-2"
+              >
+                <Upload size={20} />
+                Upload Image
+              </button>
+            </div>
+
+            <input
+              ref={cameraInputRef}
+              type="file"
+              accept="image/*"
+              capture="environment"
+              onChange={handleImageCapture}
+              className="hidden"
+            />
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              onChange={handleImageCapture}
+              className="hidden"
+            />
+
+            {/* Image Preview */}
+            {imagePreview && (
+              <div className="relative rounded-lg overflow-hidden bg-gray-100">
+                <img src={imagePreview} alt="Preview" className="w-full h-48 object-cover" />
+                <button
+                  onClick={() => {
+                    setImagePreview(null);
+                    setImageBase64('');
+                  }}
+                  className="absolute top-2 right-2 p-1 bg-red-500 text-white rounded-full hover:bg-red-600"
+                >
+                  <X size={20} />
+                </button>
+              </div>
+            )}
+          </div>
+
           <div>
             <label className="block text-sm font-medium mb-2">Crop Type</label>
             <select
@@ -171,12 +259,24 @@ export default function PlantHealthModule() {
           <div className="flex gap-3">
             <button
               onClick={handleAddRecord}
-              className="flex-1 btn-primary"
+              disabled={isLoading || !imageBase64}
+              className="flex-1 btn-primary disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
             >
-              Save Record
+              {isLoading ? (
+                <>
+                  <div className="animate-spin">⏳</div>
+                  Analyzing...
+                </>
+              ) : (
+                'Save Record'
+              )}
             </button>
             <button
-              onClick={() => setShowForm(false)}
+              onClick={() => {
+                setShowForm(false);
+                setImagePreview(null);
+                setImageBase64('');
+              }}
               className="flex-1 px-6 py-3 rounded-lg bg-muted text-muted-foreground font-semibold transition-all duration-300"
             >
               Cancel
@@ -213,12 +313,22 @@ export default function PlantHealthModule() {
                 </button>
               </div>
 
+              {/* Image Thumbnail */}
+              {record.imageUrl && (
+                <div className="rounded-lg overflow-hidden bg-gray-100">
+                  <img src={record.imageUrl} alt="Detection" className="w-full h-32 object-cover" />
+                </div>
+              )}
+
               <div className="bg-secondary/50 p-4 rounded-lg space-y-2">
                 <div className="flex items-start gap-2">
                   <AlertCircle size={18} className="text-accent mt-1 flex-shrink-0" />
                   <div>
                     <p className="font-semibold text-sm">Disease Detected</p>
                     <p className="text-sm text-foreground">{record.diseaseDetected}</p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Confidence: {(record.confidence * 100).toFixed(0)}%
+                    </p>
                   </div>
                 </div>
               </div>

@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react';
-import { Camera, Mic, MapPin, AlertCircle, Plus, Trash2, CheckCircle } from 'lucide-react';
+import { useState } from 'react';
+import { Camera, Mic, MapPin } from 'lucide-react';
 import PlantHealthModule from '@/components/PlantHealthModule';
 import VoiceAssistantModule from '@/components/VoiceAssistantModule';
 import PrecisionSafetyModule from '@/components/PrecisionSafetyModule';

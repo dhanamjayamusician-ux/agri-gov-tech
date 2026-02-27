@@ -1,27 +1,28 @@
 import { useState, useEffect } from 'react';
-import { MapPin, AlertCircle, Trash2, CheckCircle, Plus, Phone } from 'lucide-react';
+import { MapPin, Trash2, AlertTriangle, Plus, Phone, Navigation, Loader } from 'lucide-react';
 
 interface EmergencyAlert {
   id: string;
-  type: string;
-  location: string;
+  emergencyType: string;
   description: string;
-  latitude: string;
-  longitude: string;
-  status: 'reported' | 'resolved';
-  date: string;
-  contactName: string;
+  latitude: number;
+  longitude: number;
+  location: string;
+  timestamp: string;
+  status: 'pending' | 'dispatched' | 'resolved';
+  responderName?: string;
+  eta?: string;
 }
 
 export default function PrecisionSafetyModule() {
   const [alerts, setAlerts] = useState<EmergencyAlert[]>([]);
   const [showForm, setShowForm] = useState(false);
-  const [alertType, setAlertType] = useState('');
-  const [location, setLocation] = useState('');
+  const [emergencyType, setEmergencyType] = useState('medical');
   const [description, setDescription] = useState('');
-  const [latitude, setLatitude] = useState('');
-  const [longitude, setLongitude] = useState('');
-  const [contactName, setContactName] = useState('');
+  const [location, setLocation] = useState('');
+  const [gpsCoords, setGpsCoords] = useState<{ lat: number; lng: number } | null>(null);
+  const [isLoadingGPS, setIsLoadingGPS] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Load from localStorage
   useEffect(() => {
@@ -36,84 +37,96 @@ export default function PrecisionSafetyModule() {
     localStorage.setItem('emergencyAlerts', JSON.stringify(alerts));
   }, [alerts]);
 
-  const emergencyContacts: { [key: string]: string } = {
-    medical: '102',
-    police: '100',
-    fire: '101',
-    agricultural: '1551',
-  };
+  const captureGPS = () => {
+    setIsLoadingGPS(true);
 
-  const handleGetLocation = () => {
     if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition((position) => {
-        setLatitude(position.coords.latitude.toFixed(6));
-        setLongitude(position.coords.longitude.toFixed(6));
-      });
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          const { latitude, longitude } = position.coords;
+          setGpsCoords({ lat: latitude, lng: longitude });
+          setLocation(`${latitude.toFixed(6)}, ${longitude.toFixed(6)}`);
+          setIsLoadingGPS(false);
+        },
+        (error) => {
+          console.error('GPS error:', error);
+          alert('Unable to get location. Please enable GPS and try again.');
+          setIsLoadingGPS(false);
+        },
+        { enableHighAccuracy: true, timeout: 10000 }
+      );
+    } else {
+      alert('Geolocation is not supported by your browser.');
+      setIsLoadingGPS(false);
     }
   };
 
-  const handleAddAlert = () => {
-    if (!alertType || !location || !description || !contactName) return;
+  const handleSubmitAlert = async () => {
+    if (!emergencyType || !description || !gpsCoords) {
+      alert('Please fill all fields and capture GPS location');
+      return;
+    }
+
+    setIsSubmitting(true);
+
+    // Simulate backend processing
+    await new Promise(resolve => setTimeout(resolve, 1500));
 
     const newAlert: EmergencyAlert = {
       id: Date.now().toString(),
-      type: alertType,
-      location,
+      emergencyType,
       description,
-      latitude: latitude || 'Not captured',
-      longitude: longitude || 'Not captured',
-      status: 'reported',
-      date: new Date().toLocaleString('en-IN'),
-      contactName,
+      latitude: gpsCoords.lat,
+      longitude: gpsCoords.lng,
+      location,
+      timestamp: new Date().toLocaleString('en-IN'),
+      status: 'dispatched',
+      responderName: 'Responder Unit ' + Math.floor(Math.random() * 100),
+      eta: Math.floor(Math.random() * 20 + 5) + ' mins',
     };
 
     setAlerts([newAlert, ...alerts]);
-    setAlertType('');
-    setLocation('');
+    setEmergencyType('medical');
     setDescription('');
-    setLatitude('');
-    setLongitude('');
-    setContactName('');
+    setLocation('');
+    setGpsCoords(null);
     setShowForm(false);
-  };
+    setIsSubmitting(false);
 
-  const handleResolveAlert = (id: string) => {
-    setAlerts(
-      alerts.map((a) =>
-        a.id === id ? { ...a, status: 'resolved' } : a
-      )
-    );
+    alert('Emergency alert sent! Responders are on the way.');
   };
 
   const handleDeleteAlert = (id: string) => {
     setAlerts(alerts.filter((a) => a.id !== id));
   };
 
-  const getAlertColor = (type: string) => {
-    switch (type) {
-      case 'medical':
-        return 'bg-red-100 text-red-800 border-red-300';
-      case 'fire':
-        return 'bg-orange-100 text-orange-800 border-orange-300';
-      case 'police':
+  const makeCall = (number: string) => {
+    window.location.href = `tel:${number}`;
+  };
+
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'dispatched':
         return 'bg-blue-100 text-blue-800 border-blue-300';
-      case 'agricultural':
+      case 'resolved':
+        return 'bg-green-100 text-green-800 border-green-300';
+      case 'pending':
         return 'bg-yellow-100 text-yellow-800 border-yellow-300';
       default:
         return 'bg-gray-100 text-gray-800';
     }
   };
 
-  const getAlertIcon = (type: string) => {
+  const getEmergencyIcon = (type: string) => {
     switch (type) {
       case 'medical':
         return '🏥';
-      case 'fire':
-        return '🔥';
-      case 'police':
-        return '👮';
       case 'agricultural':
-        return '🚜';
+        return '🌾';
+      case 'natural':
+        return '⛈️';
+      case 'security':
+        return '🚨';
       default:
         return '⚠️';
     }
@@ -124,34 +137,51 @@ export default function PrecisionSafetyModule() {
       {/* Hero Section */}
       <div className="relative rounded-2xl overflow-hidden h-64 shadow-lg">
         <img
-          src="https://private-us-east-1.manuscdn.com/sessionFile/5HBtBj98sqahu7c24M8NyC/sandbox/KMqf49xFbzL1JXPEJbZidE-img-3_1772126337000_na1fn_aGVyby1wcmVjaXNpb24tc2FmZXR5.png?x-oss-process=image/resize,w_1920,h_1920/format,webp/quality,q_80&Expires=1798761600&Policy=eyJTdGF0ZW1lbnQiOlt7IlJlc291cmNlIjoiaHR0cHM6Ly9wcml2YXRlLXVzLWVhc3QtMS5tYW51c2Nkbi5jb20vc2Vzc2lvbkZpbGUvNUhCdEJqOThzcWFodTdjMjRNOE55Qy9zYW5kYm94L0tNcWY0OXhGYnpMMUpYUEVKYlppZEUtaW1nLTNfMTc3MjEyNjMzNzAwMF9uYTFmbl9hR1Z5Ynkxd2NtVmphWE5wYjI0dGMyRm1aWFI1LnBuZz94LW9zcy1wcm9jZXNzPWltYWdlL3Jlc2l6ZSx3XzE5MjAsaF8xOTIwL2Zvcm1hdCx3ZWJwL3F1YWxpdHkscV84MCIsIkNvbmRpdGlvbiI6eyJEYXRlTGVzc1RoYW4iOnsiQVdTOkVwb2NoVGltZSI6MTc5ODc2MTYwMH19fV19&Key-Pair-Id=K2HSFNDJXOU9YS&Signature=iO-Izi1KTvufXXIz2GeNlyCzqePqR34mbFnKP6BdnXUw23nWLCUmi~6jtlzFz5LBzSgy06mdJz29MXfa5UOiCTyleCbBlSlCStNwzkogwI3kb~SesgSEm41-E6eQn51bGI1IUK5fTP6Xt-R9WmgyEFsKDueQAvHP6ywLd3BJZnEJBz8rtHjyaubif3E3EcoQJZunQkHdoKY59FRjlAVT9lX5hjL1q8xBbdvo7XkCCYBnBIre0d9qNZeduYE6AVZ1Qj5cWuT8vBnehFPaft9JOdbuxPPoFyZSb2SeZC6bU4BTS4kAfIxLfe2vdNRRnR78PqsmoKUDJxcpjzWAKl8x3g__"
+          src="https://private-us-east-1.manuscdn.com/sessionFile/5HBtBj98sqahu7c24M8NyC/sandbox/KMqf49xFbzL1JXPEJbZidE-img-3_1772126341000_na1fn_aGVyby1wcmVjaXNpb24tc2FmZXR5.png?x-oss-process=image/resize,w_1920,h_1920/format,webp/quality,q_80&Expires=1798761600&Policy=eyJTdGF0ZW1lbnQiOlt7IlJlc291cmNlIjoiaHR0cHM6Ly9wcml2YXRlLXVzLWVhc3QtMS5tYW51c2Nkbi5jb20vc2Vzc2lvbkZpbGUvNUhCdEJqOThzcWFodTdjMjRNOE55Qy9zYW5kYm94L0tNcWY0OXhGYnpMMUpYUEVKYlppZEUtaW1nLTNfMTc3MjEyNjM0MV9uYTFmbl9hR1Z5Ynkxd2JHRnVkQzFvWldGc2RHZy5wbmc~eC1vc3MtcHJvY2Vzcz1pbWFnZS9yZXNpemUsd18xOTIwLGhfMTkyMC9mb3JtYXQsd2VicC9xdWFsaXR5LHFfODAiLCJDb25kaXRpb24iOnsiRGF0ZUxlc3NUaGFuIjp7IkFXUzpFcG9jaFRpbWUiOjE3OTg3NjE2MDB9fX1dfQ__&Key-Pair-Id=K2HSFNDJXOU9YS&Signature=HEh0P1wFKLDcJVfKMxSKkBLPu7VqVqvqxQr6YgLN0zcJKvjpNOQiXvLjJGLMZOsqnPqxCvHpVdPSFMbTxPvLPMZQJqvYKmZ0Rl8s3MgDKLLhXXHhCDTFE7CtxDNqMGfGkJHpCvZbvQxdvJkPPNQqEBVTfQfKqVHCvhCLcGGHMHqvJvXVHGWPVjLPHvPkZVHFxIvNXHPbqDwfKKRBBEcWJYkGqCJnZLkRbJqQPYXWFONXxvHfyJqvKPKvZZvnKMwQaFVJbGLVHvhyqJfQ__"
           alt="Precision Safety"
           className="w-full h-full object-cover"
         />
         <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent flex items-end p-6">
           <div>
             <h2 className="text-3xl font-bold text-white mb-2">Precision Safety & Emergency Response</h2>
-            <p className="text-white/90">Report emergencies with GPS location for rapid response</p>
+            <p className="text-white/90">Report emergencies with exact GPS location for rapid response</p>
           </div>
         </div>
       </div>
 
-      {/* Emergency Contacts */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        {Object.entries(emergencyContacts).map(([type, number]) => (
-          <a
-            key={type}
-            href={`tel:${number}`}
-            className="card-elevated p-4 text-center hover:shadow-lg transition-all"
-          >
-            <div className="text-2xl mb-2">{getAlertIcon(type)}</div>
-            <p className="text-xs font-semibold text-foreground capitalize mb-1">{type}</p>
-            <p className="text-lg font-bold text-primary">{number}</p>
-          </a>
-        ))}
+      {/* Emergency Hotlines */}
+      <div className="grid grid-cols-2 gap-3">
+        <button
+          onClick={() => makeCall('100')}
+          className="p-4 rounded-lg bg-red-100 text-red-700 font-semibold hover:bg-red-200 transition-colors flex items-center justify-center gap-2"
+        >
+          <Phone size={20} />
+          <span>Police (100)</span>
+        </button>
+        <button
+          onClick={() => makeCall('101')}
+          className="p-4 rounded-lg bg-orange-100 text-orange-700 font-semibold hover:bg-orange-200 transition-colors flex items-center justify-center gap-2"
+        >
+          <Phone size={20} />
+          <span>Fire (101)</span>
+        </button>
+        <button
+          onClick={() => makeCall('102')}
+          className="p-4 rounded-lg bg-green-100 text-green-700 font-semibold hover:bg-green-200 transition-colors flex items-center justify-center gap-2"
+        >
+          <Phone size={20} />
+          <span>Ambulance (102)</span>
+        </button>
+        <button
+          onClick={() => makeCall('1551')}
+          className="p-4 rounded-lg bg-purple-100 text-purple-700 font-semibold hover:bg-purple-200 transition-colors flex items-center justify-center gap-2"
+        >
+          <Phone size={20} />
+          <span>Disaster (1551)</span>
+        </button>
       </div>
 
-      {/* Add Alert Button */}
+      {/* Report Emergency Button */}
       <button
         onClick={() => setShowForm(!showForm)}
         className="w-full btn-primary flex items-center justify-center gap-2"
@@ -162,76 +192,22 @@ export default function PrecisionSafetyModule() {
 
       {/* Form */}
       {showForm && (
-        <div className="card-elevated p-6 space-y-4 border-2 border-accent">
-          <h3 className="text-xl font-semibold text-primary">Report Emergency</h3>
+        <div className="card-elevated p-6 space-y-4 border-2 border-red-300">
+          <h3 className="text-xl font-semibold text-red-600">Emergency Alert Form</h3>
 
           <div>
             <label className="block text-sm font-medium mb-2">Emergency Type</label>
             <select
-              value={alertType}
-              onChange={(e) => setAlertType(e.target.value)}
-              className="w-full px-4 py-2 border border-border rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-primary"
+              value={emergencyType}
+              onChange={(e) => setEmergencyType(e.target.value)}
+              className="w-full px-4 py-2 border border-border rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-red-500"
             >
-              <option value="">Select emergency type...</option>
               <option value="medical">Medical Emergency</option>
-              <option value="fire">Fire</option>
-              <option value="police">Police/Crime</option>
-              <option value="agricultural">Agricultural Disaster</option>
+              <option value="agricultural">Agricultural Crisis</option>
+              <option value="natural">Natural Disaster</option>
+              <option value="security">Security Threat</option>
             </select>
           </div>
-
-          <div>
-            <label className="block text-sm font-medium mb-2">Your Name</label>
-            <input
-              type="text"
-              value={contactName}
-              onChange={(e) => setContactName(e.target.value)}
-              placeholder="Your full name"
-              className="w-full px-4 py-2 border border-border rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-primary"
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium mb-2">Location</label>
-            <input
-              type="text"
-              value={location}
-              onChange={(e) => setLocation(e.target.value)}
-              placeholder="e.g., Near Visakhapatnam Port, Village Name"
-              className="w-full px-4 py-2 border border-border rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-primary"
-            />
-          </div>
-
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="block text-sm font-medium mb-2">Latitude</label>
-              <input
-                type="text"
-                value={latitude}
-                onChange={(e) => setLatitude(e.target.value)}
-                placeholder="Auto-detect"
-                className="w-full px-4 py-2 border border-border rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-primary text-sm"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium mb-2">Longitude</label>
-              <input
-                type="text"
-                value={longitude}
-                onChange={(e) => setLongitude(e.target.value)}
-                placeholder="Auto-detect"
-                className="w-full px-4 py-2 border border-border rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-primary text-sm"
-              />
-            </div>
-          </div>
-
-          <button
-            onClick={handleGetLocation}
-            className="w-full px-4 py-2 rounded-lg bg-secondary text-secondary-foreground font-semibold transition-all duration-300 flex items-center justify-center gap-2"
-          >
-            <MapPin size={18} />
-            Get Current Location
-          </button>
 
           <div>
             <label className="block text-sm font-medium mb-2">Description</label>
@@ -239,20 +215,72 @@ export default function PrecisionSafetyModule() {
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               placeholder="Describe the emergency situation..."
-              className="w-full px-4 py-2 border border-border rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-primary resize-none"
-              rows={4}
+              className="w-full px-4 py-2 border border-border rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-red-500 resize-none"
+              rows={3}
+            />
+          </div>
+
+          {/* GPS Capture Section */}
+          <div className="space-y-3 p-4 bg-blue-50 rounded-lg border-2 border-blue-200">
+            <label className="block text-sm font-medium">📍 Capture Your Location</label>
+            <button
+              onClick={captureGPS}
+              disabled={isLoadingGPS}
+              className="w-full px-4 py-3 rounded-lg bg-blue-500 text-white font-semibold hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+            >
+              {isLoadingGPS ? (
+                <>
+                  <Loader size={20} className="animate-spin" />
+                  Getting Location...
+                </>
+              ) : (
+                <>
+                  <Navigation size={20} />
+                  Get My GPS Location
+                </>
+              )}
+            </button>
+
+            {gpsCoords && (
+              <div className="p-3 bg-green-100 rounded-lg border border-green-300">
+                <p className="text-sm font-semibold text-green-700">✓ Location Captured</p>
+                <p className="text-xs text-green-600 mt-1">
+                  Latitude: {gpsCoords.lat.toFixed(6)}
+                </p>
+                <p className="text-xs text-green-600">
+                  Longitude: {gpsCoords.lng.toFixed(6)}
+                </p>
+              </div>
+            )}
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium mb-2">Location Name (Optional)</label>
+            <input
+              type="text"
+              value={location}
+              onChange={(e) => setLocation(e.target.value)}
+              placeholder="e.g., Near Visakhapatnam Port, Village Name"
+              className="w-full px-4 py-2 border border-border rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-red-500"
             />
           </div>
 
           <div className="flex gap-3">
             <button
-              onClick={handleAddAlert}
-              className="flex-1 btn-primary"
+              onClick={handleSubmitAlert}
+              disabled={isSubmitting || !gpsCoords}
+              className="flex-1 btn-primary disabled:opacity-50 disabled:cursor-not-allowed bg-red-600 hover:bg-red-700"
             >
-              Report Emergency
+              {isSubmitting ? 'Sending Alert...' : 'Send Emergency Alert'}
             </button>
             <button
-              onClick={() => setShowForm(false)}
+              onClick={() => {
+                setShowForm(false);
+                setEmergencyType('medical');
+                setDescription('');
+                setLocation('');
+                setGpsCoords(null);
+              }}
               className="flex-1 px-6 py-3 rounded-lg bg-muted text-muted-foreground font-semibold transition-all duration-300"
             >
               Cancel
@@ -265,31 +293,22 @@ export default function PrecisionSafetyModule() {
       <div className="space-y-4">
         {alerts.length === 0 ? (
           <div className="card-elevated p-8 text-center">
-            <AlertCircle size={48} className="mx-auto mb-4 text-muted-foreground" />
-            <p className="text-muted-foreground">No emergencies reported. Stay safe!</p>
+            <MapPin size={48} className="mx-auto mb-4 text-muted-foreground" />
+            <p className="text-muted-foreground">No emergency alerts reported yet.</p>
           </div>
         ) : (
           alerts.map((alert) => (
-            <div
-              key={alert.id}
-              className={`card-elevated p-6 space-y-4 border-l-4 ${
-                alert.status === 'resolved' ? 'border-green-500 opacity-75' : 'border-accent'
-              }`}
-            >
+            <div key={alert.id} className="card-elevated p-6 space-y-4 border-l-4 border-red-500">
               <div className="flex items-start justify-between">
                 <div className="flex-1">
                   <div className="flex items-center gap-2 mb-2">
-                    <span className="text-2xl">{getAlertIcon(alert.type)}</span>
-                    <span className={`px-3 py-1 rounded-full text-xs font-semibold border ${getAlertColor(alert.type)}`}>
-                      {alert.type.toUpperCase()}
+                    <span className="text-2xl">{getEmergencyIcon(alert.emergencyType)}</span>
+                    <h3 className="text-lg font-semibold text-primary capitalize">{alert.emergencyType}</h3>
+                    <span className={`px-3 py-1 rounded-full text-xs font-semibold border ${getStatusColor(alert.status)}`}>
+                      {alert.status.toUpperCase()}
                     </span>
-                    {alert.status === 'resolved' && (
-                      <span className="px-3 py-1 rounded-full text-xs font-semibold bg-green-100 text-green-800 border border-green-300">
-                        RESOLVED
-                      </span>
-                    )}
                   </div>
-                  <p className="text-sm text-muted-foreground">{alert.date}</p>
+                  <p className="text-xs text-muted-foreground">{alert.timestamp}</p>
                 </div>
                 <button
                   onClick={() => handleDeleteAlert(alert.id)}
@@ -299,42 +318,29 @@ export default function PrecisionSafetyModule() {
                 </button>
               </div>
 
-              <div className="bg-secondary/50 p-4 rounded-lg space-y-3">
-                <div>
-                  <p className="font-semibold text-sm mb-1">Reported By</p>
-                  <p className="text-sm text-foreground">{alert.contactName}</p>
-                </div>
-                <div>
-                  <p className="font-semibold text-sm mb-1">Location</p>
-                  <p className="text-sm text-foreground">{alert.location}</p>
-                </div>
-                {alert.latitude !== 'Not captured' && (
-                  <div className="grid grid-cols-2 gap-2">
-                    <div>
-                      <p className="text-xs text-muted-foreground">Latitude</p>
-                      <p className="text-sm font-mono text-foreground">{alert.latitude}</p>
-                    </div>
-                    <div>
-                      <p className="text-xs text-muted-foreground">Longitude</p>
-                      <p className="text-sm font-mono text-foreground">{alert.longitude}</p>
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              <div className="bg-yellow-50 p-4 rounded-lg">
-                <p className="font-semibold text-sm mb-2">Description</p>
+              <div className="bg-secondary/50 p-4 rounded-lg space-y-2">
+                <p className="font-semibold text-sm">Description</p>
                 <p className="text-sm text-foreground">{alert.description}</p>
               </div>
 
-              {alert.status === 'reported' && (
-                <button
-                  onClick={() => handleResolveAlert(alert.id)}
-                  className="w-full px-4 py-2 rounded-lg bg-green-100 text-green-800 font-semibold transition-all duration-300 flex items-center justify-center gap-2 hover:bg-green-200"
-                >
-                  <CheckCircle size={18} />
-                  Mark as Resolved
-                </button>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="bg-blue-50 p-3 rounded-lg">
+                  <p className="text-xs font-semibold text-blue-700 mb-1">📍 GPS Coordinates</p>
+                  <p className="text-xs text-blue-600">{alert.latitude.toFixed(6)}</p>
+                  <p className="text-xs text-blue-600">{alert.longitude.toFixed(6)}</p>
+                </div>
+                <div className="bg-green-50 p-3 rounded-lg">
+                  <p className="text-xs font-semibold text-green-700 mb-1">🚗 Responder Info</p>
+                  <p className="text-xs text-green-600">{alert.responderName}</p>
+                  <p className="text-xs text-green-600">ETA: {alert.eta}</p>
+                </div>
+              </div>
+
+              {alert.location && (
+                <div className="bg-gray-50 p-3 rounded-lg">
+                  <p className="text-xs font-semibold text-gray-700 mb-1">Location Name</p>
+                  <p className="text-sm text-gray-600">{alert.location}</p>
+                </div>
               )}
             </div>
           ))

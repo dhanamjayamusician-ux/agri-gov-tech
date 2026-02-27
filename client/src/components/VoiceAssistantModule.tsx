@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react';
-import { Mic, Trash2, CheckCircle, Plus, Volume2 } from 'lucide-react';
+import { useState, useEffect, useRef } from 'react';
+import { Mic, Trash2, CheckCircle, Plus, Volume2, Square } from 'lucide-react';
 
 interface VoiceQuery {
   id: string;
@@ -8,6 +8,14 @@ interface VoiceQuery {
   response: string;
   date: string;
   category: string;
+  isListening: boolean;
+}
+
+declare global {
+  interface Window {
+    webkitSpeechRecognition: any;
+    SpeechRecognition: any;
+  }
 }
 
 export default function VoiceAssistantModule() {
@@ -16,6 +24,40 @@ export default function VoiceAssistantModule() {
   const [query, setQuery] = useState('');
   const [language, setLanguage] = useState('telugu');
   const [category, setCategory] = useState('general');
+  const [isListening, setIsListening] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const recognitionRef = useRef<any>(null);
+
+  // Initialize Speech Recognition
+  useEffect(() => {
+    const SpeechRecognition = window.webkitSpeechRecognition || window.SpeechRecognition;
+    if (SpeechRecognition) {
+      recognitionRef.current = new SpeechRecognition();
+      recognitionRef.current.continuous = false;
+      recognitionRef.current.interimResults = false;
+
+      recognitionRef.current.onstart = () => {
+        setIsListening(true);
+      };
+
+      recognitionRef.current.onresult = (event: any) => {
+        let transcript = '';
+        for (let i = event.resultIndex; i < event.results.length; i++) {
+          transcript += event.results[i][0].transcript;
+        }
+        setQuery(transcript);
+      };
+
+      recognitionRef.current.onerror = (event: any) => {
+        console.error('Speech recognition error:', event.error);
+        setIsListening(false);
+      };
+
+      recognitionRef.current.onend = () => {
+        setIsListening(false);
+      };
+    }
+  }, []);
 
   // Load from localStorage
   useEffect(() => {
@@ -30,6 +72,38 @@ export default function VoiceAssistantModule() {
     localStorage.setItem('voiceQueries', JSON.stringify(queries));
   }, [queries]);
 
+  // NLP Intent Classification (Mock)
+  const classifyIntent = (text: string): string => {
+    const lowerText = text.toLowerCase();
+
+    // Irrigation keywords
+    if (lowerText.includes('water') || lowerText.includes('irrigation') || lowerText.includes('नीर') || lowerText.includes('నీరు')) {
+      return 'irrigation';
+    }
+
+    // Fertilizer keywords
+    if (lowerText.includes('fertilizer') || lowerText.includes('manure') || lowerText.includes('खाद') || lowerText.includes('సారం')) {
+      return 'fertilizer';
+    }
+
+    // Pest control keywords
+    if (lowerText.includes('pest') || lowerText.includes('insect') || lowerText.includes('कीट') || lowerText.includes('కీటకాలు')) {
+      return 'pest';
+    }
+
+    // Weather keywords
+    if (lowerText.includes('weather') || lowerText.includes('rain') || lowerText.includes('मौसम') || lowerText.includes('వాతావరణం')) {
+      return 'weather';
+    }
+
+    // Scheme keywords
+    if (lowerText.includes('scheme') || lowerText.includes('subsidy') || lowerText.includes('योजना') || lowerText.includes('స్కీమ్')) {
+      return 'scheme';
+    }
+
+    return 'general';
+  };
+
   const mockResponses: { [key: string]: string } = {
     irrigation: 'Visakhapatnam region lo rice cultivation ki liye 7-10 days gap lo irrigation necessary. Soil moisture check chesi accordingly irrigation cheyandi.',
     fertilizer: 'Rice crop ki liye Urea 120 kg/hectare, Phosphorus 60 kg/hectare, Potash 40 kg/hectare recommend chestunnam.',
@@ -39,10 +113,31 @@ export default function VoiceAssistantModule() {
     general: 'Mee prashna kosam dhanyavadalu. Kripaya specific information ichandi better assistance ki.',
   };
 
-  const handleAddQuery = () => {
+  const startListening = () => {
+    if (recognitionRef.current) {
+      const languageCode = language === 'telugu' ? 'te-IN' : language === 'hindi' ? 'hi-IN' : 'en-US';
+      recognitionRef.current.lang = languageCode;
+      recognitionRef.current.start();
+    }
+  };
+
+  const stopListening = () => {
+    if (recognitionRef.current) {
+      recognitionRef.current.stop();
+    }
+  };
+
+  const handleAddQuery = async () => {
     if (!query) return;
 
-    const response = mockResponses[category] || mockResponses['general'];
+    setIsLoading(true);
+
+    // Simulate NLP processing
+    await new Promise(resolve => setTimeout(resolve, 800));
+
+    // Auto-classify intent
+    const detectedCategory = classifyIntent(query);
+    const response = mockResponses[detectedCategory] || mockResponses['general'];
 
     const newQuery: VoiceQuery = {
       id: Date.now().toString(),
@@ -50,13 +145,15 @@ export default function VoiceAssistantModule() {
       language,
       response,
       date: new Date().toLocaleDateString('en-IN'),
-      category,
+      category: detectedCategory,
+      isListening: false,
     };
 
     setQueries([newQuery, ...queries]);
     setQuery('');
     setCategory('general');
     setShowForm(false);
+    setIsLoading(false);
   };
 
   const handleDeleteQuery = (id: string) => {
@@ -121,41 +218,54 @@ export default function VoiceAssistantModule() {
           </div>
 
           <div>
-            <label className="block text-sm font-medium mb-2">Question Category</label>
-            <select
-              value={category}
-              onChange={(e) => setCategory(e.target.value)}
-              className="w-full px-4 py-2 border border-border rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-primary"
-            >
-              <option value="general">General Query</option>
-              <option value="irrigation">Irrigation</option>
-              <option value="fertilizer">Fertilizer</option>
-              <option value="pest">Pest Control</option>
-              <option value="weather">Weather</option>
-              <option value="scheme">Government Schemes</option>
-            </select>
-          </div>
-
-          <div>
             <label className="block text-sm font-medium mb-2">Your Question</label>
             <textarea
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder="Type or describe your question..."
+              placeholder="Type or speak your question..."
               className="w-full px-4 py-2 border border-border rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-primary resize-none"
               rows={4}
             />
           </div>
 
+          {/* Speech-to-Text Controls */}
+          <div className="space-y-2">
+            <label className="block text-sm font-medium">Or Use Voice Input</label>
+            <div className="flex gap-2">
+              <button
+                onClick={startListening}
+                disabled={isListening}
+                className="flex-1 px-4 py-3 rounded-lg bg-blue-500 text-white font-semibold hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+              >
+                <Mic size={20} />
+                {isListening ? 'Listening...' : 'Start Recording'}
+              </button>
+              {isListening && (
+                <button
+                  onClick={stopListening}
+                  className="px-4 py-3 rounded-lg bg-red-500 text-white font-semibold hover:bg-red-600 flex items-center justify-center gap-2"
+                >
+                  <Square size={20} />
+                  Stop
+                </button>
+              )}
+            </div>
+          </div>
+
           <div className="flex gap-3">
             <button
               onClick={handleAddQuery}
-              className="flex-1 btn-primary"
+              disabled={isLoading || !query}
+              className="flex-1 btn-primary disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              Get Answer
+              {isLoading ? 'Processing...' : 'Get Answer'}
             </button>
             <button
-              onClick={() => setShowForm(false)}
+              onClick={() => {
+                setShowForm(false);
+                setQuery('');
+                setCategory('general');
+              }}
               className="flex-1 px-6 py-3 rounded-lg bg-muted text-muted-foreground font-semibold transition-all duration-300"
             >
               Cancel
@@ -182,7 +292,7 @@ export default function VoiceAssistantModule() {
                     </span>
                     <span className="text-xs text-muted-foreground">{q.language.toUpperCase()}</span>
                   </div>
-                  <p className="text-sm text-muted-foreground">{q.date}</p>
+                  <p className="text-xs text-muted-foreground">{q.date}</p>
                 </div>
                 <button
                   onClick={() => handleDeleteQuery(q.id)}
